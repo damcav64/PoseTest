@@ -1,0 +1,3 @@
+include ':mp_pose_detection'
+include ':app'
+rootProject.name = "PoseTest"

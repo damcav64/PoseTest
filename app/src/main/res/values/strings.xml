@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">PoseTest</string>
+    <string name="no_camera_access" translatable="false">Checking camera and storage permissions...</string>
+</resources>
