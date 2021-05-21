@@ -2,12 +2,18 @@ package jp.daniel.posetest;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import android.graphics.SurfaceTexture;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 
@@ -104,6 +110,8 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean modelIsPose = true;
 
+    private DownloadManager dm;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -112,8 +120,8 @@ public class MainActivity extends AppCompatActivity {
         ProtoUtil.registerTypeName(NormalizedLandmarkList.class, "mediapipe.NormalizedLandmarkList");
 
         int port = 8887; // 843 flash policy port
-        WSServer wsServer = new WSServer(port);
-        wsServer.start();
+     //   WSServer wsServer = new WSServer(port);
+      //  wsServer.start();
 
         try {
             applicationInfo =
@@ -123,6 +131,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         verifyPermissions(this);
+
+        downloadModel(this);
     }
 
     /*
@@ -249,6 +259,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void go() {
+        /*
         if (permissionsGranted) {
             setFrameProcessor();
             createConverter();
@@ -260,6 +271,8 @@ public class MainActivity extends AppCompatActivity {
                 startCamera();
             }
         }
+        */
+
     }
 
     @Override
@@ -435,7 +448,8 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
         if ((grantResults[0] == PackageManager.PERMISSION_GRANTED)
-            && (grantResults[1] == PackageManager.PERMISSION_GRANTED)) {
+            && (grantResults[1] == PackageManager.PERMISSION_GRANTED)
+                && (grantResults[2] == PackageManager.PERMISSION_GRANTED)){
             permissionsGranted = true;
             go();
         }
@@ -453,6 +467,11 @@ public class MainActivity extends AppCompatActivity {
 
         if (ActivityCompat.checkSelfPermission(activity, Manifest.permission.READ_EXTERNAL_STORAGE)
             == PackageManager.PERMISSION_DENIED) {
+            requestedPermissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+        }
+
+        if (ActivityCompat.checkSelfPermission(activity, Manifest.permission.INTERNET)
+                == PackageManager.PERMISSION_DENIED) {
             requestedPermissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
         }
 
@@ -603,4 +622,39 @@ public class MainActivity extends AppCompatActivity {
 //        long declaredLength = assetFileDescriptor.getDeclaredLength() ;
 //        return fileChannel.map( FileChannel.MapMode.READ_ONLY , startoffset , declaredLength ) ;
 //    }
+
+    private void downloadModel(Context c) {
+        File modelDir = getExternalFilesDir(null);
+        try {
+        dm = (DownloadManager) c.getSystemService(DOWNLOAD_SERVICE);
+     //   Uri downloadUri = Uri.parse("http://www.zidsworld.com/wp-content/uploads/2018/06/cat_1530281469.jpg");
+        Uri downloadUri=Uri.parse("https://ichef.bbci.co.uk/news/976/cpsprodpb/138BA/production/_118585008_gettyimages-1193617830.jpg");
+        DownloadManager.Request request = new DownloadManager.Request(downloadUri);
+        request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI)
+              //  .setDestinationUri(Uri.parse(file))
+                .setDestinationInExternalFilesDir(c,  null, "cat.jpg")
+                .setTitle("cat.jpg").setDescription("model download")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE);
+        dm.enqueue(request);
+        Toast.makeText(getApplicationContext(), "Downloading model", Toast.LENGTH_LONG).show();
+
+            IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+            BroadcastReceiver receiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    long reference = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                //    if (dm == reference) {
+                        // Do something with downloaded file.
+                 //   }
+                    Toast.makeText(getApplicationContext(), "Model downloaded", Toast.LENGTH_LONG).show();
+                }
+            };
+            registerReceiver(receiver, filter);
+
+    }  catch (Exception ex) {
+        // just in case, it should never be called anyway
+        Toast.makeText(getApplicationContext(),"Unable to save image", Toast.LENGTH_LONG).show();
+        ex.printStackTrace();
+    }}
+
 }
