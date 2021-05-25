@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="Gradle: artifacts:mp_pose_detection:unspecified">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/mp_pose_detection/build/.transforms/59b1a9577120b7595ba18b55fbd2337f/jetified-mp_pose_detection/jars/classes.jar!/" />
+      <root url="file://$PROJECT_DIR$/mp_pose_detection/build/.transforms/59b1a9577120b7595ba18b55fbd2337f/jetified-mp_pose_detection/res" />
+      <root url="file://$PROJECT_DIR$/mp_pose_detection/build/.transforms/59b1a9577120b7595ba18b55fbd2337f/jetified-mp_pose_detection/AndroidManifest.xml" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -2,25 +2,19 @@ package jp.daniel.posetest;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.DownloadManager;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import android.graphics.SurfaceTexture;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
-import android.os.Environment;
 import android.util.Log;
 import android.util.Size;
 import android.view.SurfaceHolder;
@@ -30,13 +24,14 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.snackbar.Snackbar;
 import com.google.mediapipe.formats.proto.LandmarkProto.NormalizedLandmark;
 import com.google.mediapipe.formats.proto.LandmarkProto.NormalizedLandmarkList;
 import com.google.mediapipe.components.CameraHelper;
 import com.google.mediapipe.components.CameraXPreviewHelper;
 import com.google.mediapipe.components.ExternalTextureConverter;
 import com.google.mediapipe.components.FrameProcessor;
-import com.google.mediapipe.components.PermissionHelper;
 import com.google.mediapipe.framework.AndroidAssetUtil;
 import com.google.mediapipe.framework.PacketGetter;
 import com.google.mediapipe.framework.ProtoUtil;
@@ -50,14 +45,9 @@ import org.json.JSONObject;
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileDescriptor;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.lang.reflect.Array;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
@@ -104,13 +94,9 @@ public class MainActivity extends AppCompatActivity {
 
     private Interpreter tfLite;
 
-    private String[] labels;
-    private String modelVersion;
+
+
     private boolean permissionsGranted = false;
-
-    private boolean modelIsPose = true;
-
-    private DownloadManager dm;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -132,7 +118,17 @@ public class MainActivity extends AppCompatActivity {
 
         verifyPermissions(this);
 
-        downloadModel(this);
+        FloatingActionButton fab = (FloatingActionButton)findViewById(R.id.fab);
+
+        fab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
+                        .setAction("Action", null).show();
+                Intent activity2Intent = new Intent(getApplicationContext(), ModelsActiviity.class);
+                startActivity(activity2Intent);
+            }
+        });
     }
 
     /*
@@ -151,13 +147,13 @@ public class MainActivity extends AppCompatActivity {
      */
 
     private float[][][] getPoseLandmarksArray2(NormalizedLandmarkList poseLandmarks) {
-        float[][][] data = new float[1][33][modelIsPose ? 4 : 3];
+        float[][][] data = new float[1][33][ModelMetaData.modelIsPose ? 4 : 3];
         int landmarkIndex = 0;
         for (NormalizedLandmark landmark : poseLandmarks.getLandmarkList()) {
             data[0][landmarkIndex][0] = landmark.getX();
             data[0][landmarkIndex][1] = landmark.getY();
             data[0][landmarkIndex][2] = landmark.getZ();
-            if (modelIsPose) {
+            if (ModelMetaData.modelIsPose) {
                 data[0][landmarkIndex][3] = landmark.getVisibility();
             }
             landmarkIndex++;
@@ -259,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void go() {
-        /*
+
         if (permissionsGranted) {
             setFrameProcessor();
             createConverter();
@@ -271,7 +267,7 @@ public class MainActivity extends AppCompatActivity {
                 startCamera();
             }
         }
-        */
+
 
     }
 
@@ -364,83 +360,18 @@ public class MainActivity extends AppCompatActivity {
 
     private  MappedByteBuffer loadModelFile2(String modelFilename)
             throws IOException {
-        File sdcard = getExternalFilesDir(null);
-        File modelFile = new File(sdcard, YCMA_MODEL);
+        File modelFile = ModelMetaData.getModelFilePath(this, false);
         FileInputStream fis = new FileInputStream(modelFile);
         FileChannel fileChannel = fis.getChannel();
         long declaredLength = modelFile.length();
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, declaredLength);
     }
 
-    private String readJsonFile(String url) {
-    //    File sdcard = Environment.getExternalStorageDirectory();
-        File sdcard = getExternalFilesDir(null);
-        String rawJson = "";
-        FileInputStream fileInputStream = null;
-        try {
-            File mapFile = new File(sdcard, url);
-            fileInputStream = new FileInputStream(mapFile);
-
-            if (fileInputStream != null) {
-                InputStreamReader inputStreamReader = new InputStreamReader(fileInputStream);
-                BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-                String receiveString = "";
-                StringBuilder stringBuilder = new StringBuilder();
-
-                while ((receiveString = bufferedReader.readLine()) != null) {
-                    stringBuilder.append(receiveString);
-                }
-                rawJson = stringBuilder.toString();
-            }
-        } catch (FileNotFoundException e) {
-            Toast.makeText(MainActivity.this, "Can't load Json: " + e.toString(),
-                    Toast.LENGTH_SHORT).show();
-            return "";
-        } catch (IOException e) {
-            Toast.makeText(MainActivity.this, "Can't load Json: " + e.toString(),
-                    Toast.LENGTH_SHORT).show();
-            return "";
-        } finally {}
 
 
-        try {
-            fileInputStream.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
-        return rawJson;
-    }
 
-    private void parseJson(String json) {
-        try {
-            JSONObject j = new JSONObject(json);
-            JSONArray l = j.getJSONArray("labels");
-            labels = new String[l.length()];
-            for (int i=0; i<l.length(); i++) {
-                labels[i] = l.getString(i);
-            }
-            if (j.has("model_type")){
-                modelIsPose = j.getString("model_type").toLowerCase().equals("pose");
-            } else {
-                modelIsPose = false;
-            }
-            if (j.has("model_version")){
-                modelVersion = j.getString("model_version");
-            } else {
-                modelVersion = "default";
-            }
 
-        }
-        catch (Exception e) {
-           // e.printStackTrace();
-        }
-
-        Toast.makeText(MainActivity.this,
-                "Model type: " + (modelIsPose ? "pose" : "holistic")
-                + ", Model version: " + modelVersion,
-                Toast.LENGTH_SHORT).show();
-    }
 
     @Override
     public void onRequestPermissionsResult(
@@ -490,7 +421,7 @@ public class MainActivity extends AppCompatActivity {
     private void displayCaption(final int highestI, final float highest) {
         runOnUiThread(() -> {
             TextView v = (TextView)findViewById(R.id.caption1);
-            v.setText(labels[highestI]);
+            v.setText(ModelMetaData.labels[highestI]);
             v = (TextView)findViewById(R.id.caption2);
             v.setText(String.valueOf(highest));
 
@@ -526,12 +457,12 @@ public class MainActivity extends AppCompatActivity {
                                 //wsServer.broadcast(createLandmarksJSON(getPoseLandmarksJSON(poseLandmarks)).toString());
                                 // tflite extra
                                 float[][][] input = getPoseLandmarksArray2(poseLandmarks);
-                                float[][] output = new float[1][labels.length];
+                                float[][] output = new float[1][ModelMetaData.labels.length];
                                 tfLite.run(input, output);
 
                                 float highest = 0;
                                 int highestI = 0;
-                                for (int i=0; i<labels.length; i++) {
+                                for (int i=0; i<ModelMetaData.labels.length; i++) {
                                     if (output[0][i] > highest) {
                                         highest = output[0][i];
                                         highestI = i;
@@ -566,13 +497,13 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean getJson() {
         boolean theStuffIsOnTheSdCard = true;
-        String jason = readJsonFile(YCMA_MAP);
+        String jason = ModelMetaData.readJsonFile(this);
         if (jason.length() == 0) {
             jason = "{^labels^: [^Y^,^M^,^C^, ^A^, ^None^],  ^model_type^: ^pose^, ^model_version:^: ^default^}";
             jason = jason.replace('^', (char)34);
             theStuffIsOnTheSdCard = false;
         }
-        parseJson(jason);
+        ModelMetaData.parseLabelsJson(jason);
         return theStuffIsOnTheSdCard;
     }
 
@@ -594,7 +525,7 @@ public class MainActivity extends AppCompatActivity {
             if (!theStuffIsOnTheSdCard) {
                 tfLite = new Interpreter(loadModelFile(getAssets(), YCMA_MODEL));
             } else {
-                tfLite = new Interpreter(loadModelFile2(YCMA_MODEL));
+                tfLite = new Interpreter(loadModelFile2(ModelMetaData.MODEL_FILE));
             }
 
             Log.d(TAG, "onCreate: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -623,38 +554,6 @@ public class MainActivity extends AppCompatActivity {
 //        return fileChannel.map( FileChannel.MapMode.READ_ONLY , startoffset , declaredLength ) ;
 //    }
 
-    private void downloadModel(Context c) {
-        File modelDir = getExternalFilesDir(null);
-        try {
-        dm = (DownloadManager) c.getSystemService(DOWNLOAD_SERVICE);
-     //   Uri downloadUri = Uri.parse("http://www.zidsworld.com/wp-content/uploads/2018/06/cat_1530281469.jpg");
-        Uri downloadUri=Uri.parse("https://ichef.bbci.co.uk/news/976/cpsprodpb/138BA/production/_118585008_gettyimages-1193617830.jpg");
-        DownloadManager.Request request = new DownloadManager.Request(downloadUri);
-        request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI)
-              //  .setDestinationUri(Uri.parse(file))
-                .setDestinationInExternalFilesDir(c,  null, "cat.jpg")
-                .setTitle("cat.jpg").setDescription("model download")
-                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE);
-        dm.enqueue(request);
-        Toast.makeText(getApplicationContext(), "Downloading model", Toast.LENGTH_LONG).show();
 
-            IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-            BroadcastReceiver receiver = new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    long reference = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
-                //    if (dm == reference) {
-                        // Do something with downloaded file.
-                 //   }
-                    Toast.makeText(getApplicationContext(), "Model downloaded", Toast.LENGTH_LONG).show();
-                }
-            };
-            registerReceiver(receiver, filter);
-
-    }  catch (Exception ex) {
-        // just in case, it should never be called anyway
-        Toast.makeText(getApplicationContext(),"Unable to save image", Toast.LENGTH_LONG).show();
-        ex.printStackTrace();
-    }}
 
 }
