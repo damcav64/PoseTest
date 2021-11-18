@@ -16,7 +16,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.PoseTest">
-        <activity android:name=".ModelsActiviity"></activity>
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false" />
+        <activity android:name=".ModelsActiviity" />
         <activity
             android:name=".ModelsActivity2"
             android:label="@string/title_activity_models2"
@@ -24,7 +27,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:screenOrientation="portrait">
+            android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

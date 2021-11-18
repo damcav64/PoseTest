@@ -21,6 +21,9 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -63,7 +66,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String OUTPUT_LANDMARKS_STREAM_NAME = "pose_landmarks";
     private static final String YCMA_MODEL = "model.tflite";
     private static final String YCMA_MAP = "map.json";
-    ;
+    private String modelId = "default";
+    private int textureName = 65;
 
     private static final CameraHelper.CameraFacing CAMERA_FACING = CameraHelper.CameraFacing.FRONT;
     private static final boolean FLIP_FRAMES_VERTICALLY = true;
@@ -90,13 +94,19 @@ public class MainActivity extends AppCompatActivity {
     // ApplicationInfo for retrieving metadata defined in the manifest.
     private ApplicationInfo applicationInfo;
     // Handles camera access via the {@link CameraX} Jetpack support library.
-    private CameraXPreviewHelper cameraHelper;
+    private Camera2Helper cameraHelper;
 
     private Interpreter tfLite;
 
 
+    //new model
+    int frameCount = -1;
+    float [][][][] inputFrames;
+
 
     private boolean permissionsGranted = false;
+
+    private ListView listView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -126,10 +136,27 @@ public class MainActivity extends AppCompatActivity {
                 Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
                         .setAction("Action", null).show();
                 Intent activity2Intent = new Intent(getApplicationContext(), ModelsActiviity.class);
-                startActivity(activity2Intent);
+                startActivityForResult(activity2Intent, 1);
             }
         });
+
+        eglManager = new EglManager(null);
+
     }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == 1) {
+            if(resultCode == Activity.RESULT_OK){
+                modelId = data.getStringExtra("id");
+            }
+            if (resultCode == Activity.RESULT_CANCELED) {
+                // Write your code if there's no result
+            }
+        }
+    } //onActivityResult
 
     /*
 
@@ -146,8 +173,25 @@ public class MainActivity extends AppCompatActivity {
 
      */
 
+    float [][][][] initInputFrames() {
+        return new float[1][ModelMetaData.duration][33][ModelMetaData.modelIsPose ? 4 : 3];
+    }
+
+    private void getPoseLandmarksArrayFrames(NormalizedLandmarkList poseLandmarks, int frame, float[][][][] data) {
+        int landmarkIndex = 0;
+        for (NormalizedLandmark landmark : poseLandmarks.getLandmarkList()) {
+            data[0][frame][landmarkIndex][0] = landmark.getX();
+            data[0][frame][landmarkIndex][1] = landmark.getY();
+            data[0][frame][landmarkIndex][2] = landmark.getZ();
+            if (ModelMetaData.modelIsPose) {
+                data[0][frame][landmarkIndex][3] = landmark.getVisibility();
+            }
+            landmarkIndex++;
+        }
+    }
+
     private float[][][] getPoseLandmarksArray2(NormalizedLandmarkList poseLandmarks) {
-        float[][][] data = new float[1][33][ModelMetaData.modelIsPose ? 4 : 3];
+        float[][][]data = new float[1][33][ModelMetaData.modelIsPose ? 4 : 3];
         int landmarkIndex = 0;
         for (NormalizedLandmark landmark : poseLandmarks.getLandmarkList()) {
             data[0][landmarkIndex][0] = landmark.getX();
@@ -259,16 +303,14 @@ public class MainActivity extends AppCompatActivity {
         if (permissionsGranted) {
             setFrameProcessor();
             createConverter();
-            try{
-                sleep(1000);}
-            catch (Exception e) {
-            }
+
             if (completeSetup()) {
                 startCamera();
+                msg(/*"id: " + modelId + */ "Type: "
+                + (ModelMetaData.modelIsPose ? "pose" : "portrait"));
+                createListView();
             }
         }
-
-
     }
 
     @Override
@@ -294,17 +336,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     protected Size cameraTargetResolution() {
-        return null;
+        return new Size(640, 480);
     }
 
     public void startCamera() {
-        cameraHelper = new CameraXPreviewHelper();
+        cameraHelper = new Camera2Helper(this,new CustomSurfaceTexture(textureName));
+
         cameraHelper.setOnCameraStartedListener(
                 surfaceTexture -> {
                     onCameraStarted(surfaceTexture);
                 });
+
         cameraHelper.startCamera(
-                this, CAMERA_FACING, /*unusedSurfaceTexture=*/ null, cameraTargetResolution());
+                this, CameraHelper.CameraFacing.BACK, /*unusedSurfaceTexture=*/ null);
     }
 
     private void setupPreviewDisplayView() {
@@ -364,10 +408,19 @@ public class MainActivity extends AppCompatActivity {
         FileInputStream fis = new FileInputStream(modelFile);
         FileChannel fileChannel = fis.getChannel();
         long declaredLength = modelFile.length();
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, declaredLength);
+        MappedByteBuffer bb = null;
+        try {
+            bb = fileChannel.map(FileChannel.MapMode.READ_ONLY,
+                0, declaredLength);}
+        catch (Exception e) {
+            msg("Corrupt model");
+        }
+        return bb;
     }
 
-
+    private void msg(String text) {
+        Toast.makeText(getApplicationContext(), text, Toast.LENGTH_LONG).show();
+    }
 
 
 
@@ -419,17 +472,34 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void displayCaption(final int highestI, final float highest) {
+        /*
         runOnUiThread(() -> {
             TextView v = (TextView)findViewById(R.id.caption1);
-            v.setText(ModelMetaData.labels[highestI]);
-            v = (TextView)findViewById(R.id.caption2);
-            v.setText(String.valueOf(highest));
-
+            if (highest < 0.5) {
+                v.setText("");
+                v = (TextView) findViewById(R.id.caption2);
+                v.setText("");
+            } else {
+                v.setText(highestI == -1 ? "" : ModelMetaData.labels[highestI]);
+                v = (TextView) findViewById(R.id.caption2);
+                v.setText(highestI == -1 ? "" : String.valueOf(highest));
+            }
+        });*/
+        runOnUiThread(() -> {
+            listView.setItemChecked(highestI, true);
         });
+
     }
 
     private void setFrameProcessor() {
-        eglManager = new EglManager(null);
+
+
+        try{
+            displayCaption(-1, 0);
+            sleep(2000);}
+        catch (Exception e) {
+        }
+
         processor =
                 new FrameProcessor(
                         this,
@@ -456,9 +526,22 @@ public class MainActivity extends AppCompatActivity {
                                         PacketGetter.getProto(packet, NormalizedLandmarkList.class);
                                 //wsServer.broadcast(createLandmarksJSON(getPoseLandmarksJSON(poseLandmarks)).toString());
                                 // tflite extra
-                                float[][][] input = getPoseLandmarksArray2(poseLandmarks);
                                 float[][] output = new float[1][ModelMetaData.labels.length];
-                                tfLite.run(input, output);
+
+                                if (ModelMetaData.duration == -1) {//old model
+                                    float[][][] input = getPoseLandmarksArray2(poseLandmarks);
+                                    tfLite.run(input, output);
+                                } else {
+                                    if (frameCount == -1 //very first time
+                                            || ++frameCount == ModelMetaData.duration) {
+                                        frameCount = 0;
+                                        if (inputFrames != null) {
+                                            tfLite.run(inputFrames, output);
+                                        }
+                                        inputFrames = initInputFrames();
+                                    }
+                                    getPoseLandmarksArrayFrames(poseLandmarks, frameCount, inputFrames);
+                                }
 
                                 float highest = 0;
                                 int highestI = 0;
@@ -531,10 +614,11 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "onCreate: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             Log.d(TAG, tfLite.getInputTensor(0).toString());
             Log.d(TAG, tfLite.getOutputTensor(0).toString());
-        } catch (IOException e) {
+        } catch (Exception e) {
             Toast.makeText(MainActivity.this, "Problem with model: " + e.toString(),
                     Toast.LENGTH_SHORT).show();
             e.printStackTrace();
+            return false;
         }
 
         previewDisplayView = new SurfaceView(this);
@@ -554,6 +638,33 @@ public class MainActivity extends AppCompatActivity {
 //        return fileChannel.map( FileChannel.MapMode.READ_ONLY , startoffset , declaredLength ) ;
 //    }
 
+    private void createListView() {
+        listView = (ListView) findViewById(R.id.list);
+        listView.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+        listView.setSelector(android.R.color.darker_gray);
+        populateListView();
+        // Defined Array values to show in ListView
 
+
+        // ListView Item Click Listener
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view,
+                                    int position, long id) {
+
+            }
+
+        });
+    }
+
+    private void populateListView() {
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_activated_1, android.R.id.text1, ModelMetaData.labels);
+
+        // Assign adapter to ListView
+        listView.setAdapter(adapter);
+    }
 
 }

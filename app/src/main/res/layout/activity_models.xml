@@ -5,11 +5,36 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".ModelsActiviity">
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <TextView
 
-    <ListView
-        android:id="@+id/list"
-        android:layout_height="wrap_content"
-        android:layout_width="match_parent">
-    </ListView>
+            android:layout_height="wrap_content"
+            android:layout_width="fill_parent"
+            android:gravity="center"
+            android:textSize="20dp"
+            android:text="@string/choose_a_model" />
 
+        <ListView
+            android:background="#aaaaaa"
+            android:id="@+id/list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:layout_marginTop="49dp"
+            android:entries="@array/sports_array">
+
+        </ListView>
+
+        <Button
+            android:id="@+id/settings_button"
+
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:text="Settings"
+            android:layout_centerHorizontal="true"
+            android:layout_below="@id/list"
+            />
+    </RelativeLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

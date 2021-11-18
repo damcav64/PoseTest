@@ -1,6 +1,7 @@
 package jp.daniel.posetest;
 
 import android.content.Context;
+import android.os.Environment;
 import android.widget.Toast;
 
 import org.json.JSONArray;
@@ -15,11 +16,12 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 
 public class ModelMetaData {
-    public static String JSON_FILE = "__map.json";
-    public static String MODEL_FILE = "__model.tflite";
+    public static String JSON_FILE = "map.json";
+    public static String MODEL_FILE = "model.tflite";
 
     public static String[] labels;
     public static String modelVersion;
+    public static int duration = -1;
     public static boolean modelIsPose = true;
 
     public ModelMetaData() {
@@ -96,7 +98,11 @@ public class ModelMetaData {
             } else {
                 modelVersion = "default";
             }
-
+            if (j.has("duration")){
+                duration = j.getInt("duration");
+            } else {
+                duration = -1;
+            }
         }
         catch (Exception e) {
             // e.printStackTrace();
@@ -125,12 +131,12 @@ public class ModelMetaData {
                 rawJson = stringBuilder.toString();
             }
         } catch (FileNotFoundException e) {
-            Toast.makeText(c, "Can't load Json: " + e.toString(),
+           Toast.makeText(c, "Can't load Json: " + e.toString(),
                     Toast.LENGTH_SHORT).show();
             return "";
         } catch (IOException e) {
-            Toast.makeText(c, "Can't load Json: " + e.toString(),
-                    Toast.LENGTH_SHORT).show();
+           Toast.makeText(c, "Can't load Json: " + e.toString(),
+                   Toast.LENGTH_SHORT).show();
             return "";
         } finally {}
 
@@ -151,6 +157,7 @@ public class ModelMetaData {
 
     public static File getJsonFilePath(Context c, boolean temp) {
         File sdcard = c.getExternalFilesDir(null);
+        File s = Environment.getExternalStorageDirectory();
         return new File(sdcard, getJsonFile(temp));
     }
 
